@@ -1,36 +1,17 @@
 FROM --platform=linux/amd64 ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
-ENV DISPLAY=:0
-ENV PORT=8080
-
-RUN apt update && apt install -y \
-  xfce4 xfce4-goodies \
-  xvfb x11vnc \
-  novnc websockify \
-  xterm openssl \
-  curl wget git tzdata \
-  && rm -rf /var/lib/apt/lists/*
-
+RUN apt update -y && apt install --no-install-recommends -y xfce4 xfce4-goodies tigervnc-standalone-server novnc websockify sudo xterm init systemd snapd vim net-tools curl wget git tzdata
+RUN apt update -y && apt install -y dbus-x11 x11-utils x11-xserver-utils x11-apps
+RUN apt install software-properties-common -y
+RUN add-apt-repository ppa:mozillateam/ppa -y
+RUN echo 'Package: *' >> /etc/apt/preferences.d/mozilla-firefox
+RUN echo 'Pin: release o=LP-PPA-mozillateam' >> /etc/apt/preferences.d/mozilla-firefox
+RUN echo 'Pin-Priority: 1001' >> /etc/apt/preferences.d/mozilla-firefox
+RUN echo 'Unattended-Upgrade::Allowed-Origins:: "LP-PPA-mozillateam:jammy";' | tee /etc/apt/apt.conf.d/51unattended-upgrades-firefox
+RUN apt update -y && apt install -y firefox
+RUN apt update -y && apt install -y xubuntu-icon-theme
 RUN touch /root/.Xauthority
-
+EXPOSE 5901
 EXPOSE 8080
-
-CMD bash -ex << 'EOF'
-# Start virtual X server
-Xvfb :0 -screen 0 1024x768x16 &
-
-# Start VNC server
-x11vnc -display :0 -nopw -forever -shared &
-
-# SSL cert
-openssl req -new -x509 -days 365 -nodes \
-  -subj "/C=JP" \
-  -out /self.pem -keyout /self.pem
-
-# Start noVNC (FOREGROUND)
-websockify \
-  --web=/usr/share/novnc/ \
-  --cert=/self.pem \
-  0.0.0.0:$PORT localhost:5900
-EOF
+CMD bash -c "vncserver -localhost no -SecurityTypes None -geometry 1024x768 --I-KNOW-THIS-IS-INSECURE && openssl req -new -subj "/C=JP" -x509 -days 365 -nodes -out self.pem -keyout self.pem && websockify -D --web=/usr/share/novnc/ --cert=self.pem 8080 localhost:5901 && tail -f /dev/null"
